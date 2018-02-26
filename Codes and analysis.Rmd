@@ -1,0 +1,490 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The Behavioral Risk Factor Surveillance System (BRFSS) is a landline telephone and cellphone survey that each state
+(including the District of Columbia, Puerto Rico, and the U.S. Virgin Islands) conducts, with the objective of collecting 'risk behaviour and preventive health practices' data of adult U.S citizens.
+
+In the landline sample, they use the Disproportionate stratified sampling (DSS), dividing telephone numbers in presumed 
+density of telephone numbers.So, the numbers are divided in two strata: high density and medium density. This method aims to differentiate telephone numbers that contains a large proportion of target numbers, to the ones that contains a smaller proportion of target numbers. A randomly selected adult in a household is used to collect the data.
+
+In the cellular telephone sample, the respondents are randomly selected, with equal probability of selection. This adults resides in a private residence or college housing.
+
+The numbers are also stratified by geographic regions, to target subpopulations. Also, they are weightened in order to the data to be representative of various demographics characteristics, such as age, race, education, sex etc.
+
+Therefore, the data is generalizable to the non-institutionalized adult population of the states. However, its an observational study, and not an experiment, because there is no random assignment to the variables.Thus, no causality inferences can be extracted of the data.  
+
+It's possible that this data falls on the non-response bias, because some participantes can choose not to particpate on the survey. However, the weighting procedure aims to adjust this possible issue (https://www.cdc.gov/brfss/factsheets/pdf/dbs_brfss_survey.pdf). One study aimed to analyse the impact of non-response bias on the BRFSS, finding some indications that it can occurred in some variables (However, it's a study of 2012, and methods could be improved since then) (https://www.ncbi.nlm.nih.gov/pubmed/20961872)
+
+
+
+
+* * *
+
+## Part 2: Research questions
+
+**Research question 1:** Is there a correlation between an associated smoking habit and binge drinking behaviour and income groups?
+
+It would be interesting to see how an prejudical habit of use of both licit drugs contained in the data relates to income levels. This aims to focus on a more abusive use of these drugs. As there is no 'safe levels' to tobacco use, I'll use only the data of if someone is a smoker or not. On the other hand, binge drinking is considered  'the most common, costly, and deadly pattern of excessive alcohol use in the United States' (https://www.cdc.gov/alcohol/fact-sheets/binge-drinking.htm), I'll use this variable to differentiate this 'abusive' behaviour from casual drinkers. 
+
+**Research question 2:** Is there a correlation between the length of time since a last routine checkup was performed by someone and its sex?
+
+It is a public health concern the fact of men's low rates of medical and psychological help-seeking (http://www.tandfonline.com/doi/abs/10.1080/17437199.2013.840954, http://www.scielo.br/scielo.php?script=sci_arttext&pid=S1413-81232011000700030 ), specially regarding primary care. Does this issue is shown on the BRFSS data? Does the lenght of time since a last routine checkup varies from males to females? 'Lenght of time since a last routine checkup' is chosen because it's a variable that includes preventive medicine.
+
+**Research question 3:** Is there any correlation between income groups and sex and/or race?
+
+Its a huge debate on the internet and other environments about issues such as gender pay gap and racial wage gap. Does the data of BRFSS shows any difference between income groups and sex and/or race? Does any particular race group or sex have bigger or smaller proportion on higher income groups?
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Research quesion 1:**
+
+To analyse if there is a correlation between an associated smoking habit and binge drinking behaviour and income groups I'll use the following variables:
+
+_rfsmok3: Computed Smoking Status
+
+_rfbing5: Binge Drinking Calculated Variable
+
+income2: Income Level
+
+I'll analyse each variable to see what is the information contained in each one. First, the binge drinking:
+
+```{r}
+brfss2013 %>% group_by(X_rfbing5) %>%   summarise(count = n())
+```
+
+This variable presents the outcome 'Yes', if the person is a binge drinker (58849 people), and a 'No' if is not (409195 people). Also, there are NA values.
+
+Now, the smoking status:
+
+```{r}
+brfss2013 %>% group_by(X_rfsmok3) %>%   summarise(count = n())
+```
+
+Similarly to the binge drinking variable, the smoking status presents the outcome 'Yes', if the person is a smoker (76654 people), and a 'No' if it's not (399786 people). With NA values.
+
+
+Now, the income level:
+
+```{r}
+brfss2013 %>% group_by(income2) %>%   summarise(count = n())
+```
+
+The income level variable has 8 categories, each representing a level of income, and also with NA values. The level with most people is '$75,000 or more' and with less people is 'Less than $10,000'.
+
+To proceed with the analysis, we should take out the NA values, to 
+possibilitate our data manipulation.
+
+```{r}
+smoke_income_nona <- brfss2013 %>% filter(!is.na(X_rfbing5), !is.na(X_rfsmok3), !is.na(income2))
+```
+
+I want to analyse the associate use of tobacco and alcohol, using data that are the closest to what would be people that have and exaggerated/harmful use of this substances. In that context, I'll create a new variable to people that are binge drinkers ('Yes' on the '_rfbing5' variable) and smokers ('Yes' on the '_rfsmok3' variable), and name it 'bingeandsmoke'.
+
+```{r}
+smoke_income_nona <- smoke_income_nona %>% mutate(bingeandsmoke = ifelse(X_rfbing5=='Yes'& X_rfsmok3=='Yes', 'Yes', 'No'))
+```
+
+Now, I'll relate this variable to the income groups, to see how it is distributed in each one. To do that, I'll create a new object that contains the proportion of people that are 'Yes' in the variable 'bingeandsmoke' in each income level, saving it in the object 'propinc_smkbin'.
+
+```{r}
+propinc_smkbin <- smoke_income_nona %>% group_by(income2) %>% summarise(propbs = sum(bingeandsmoke == 'Yes') / n())
+```
+
+Now, let's see what is the proportion in each income level.
+
+```{r}
+propinc_smkbin
+```
+
+Observing 'propinc_smkbin' it's possible to see that, as the income levels increase,  the proportion of people that are smokers and binge drinkers decrease. With the 'Less than $15,000' to 'Less than $20,000' being the only exception.
+
+I'll make a graphic to this proportions, but first, I'll add linebreaks to make the 'income2' variable legible.
+
+```{r}
+levels(propinc_smkbin$income2) <- gsub(" ", "\n", levels(propinc_smkbin$income2))
+```
+
+And with the following graphic, this decrease in each income level can be visually seen.
+
+```{r}
+ggplot(propinc_smkbin, aes(income2,propbs)) + geom_point() + labs(title = 'Proportion of smokers and binge drinkers in each Income level', x= 'Income Level', y= 'Proportion')
+```
+
+With this, we can see that the survey results indicate a correlation between the associate habit of smoking and binge drinking and income level. As the income levels increase, the proportion of people with this habits decreases. There appears to be a negative relationship between  the variables. 
+
+I can only speculate about for what reasons this relationship exists (considering that the correlation found here is true). Maybe people with low income levels tend to have issues that comes from their financial situation, and that issues leads then to this kind of habit more often than to richer people. It is known that social and financial problems can often be a fertile soil to this kind of behaviour to grow.
+
+
+
+
+**Research question 2:**
+To analyse if there is a correlation between the last time since a routine checkup and the sex of person I'll use use the following variables:
+
+checkup1: Length Of Time Since Last Routine Checkup
+
+sex: Respondents Sex
+
+First, I'll analyse each variable to see what is the information contained in each one. First, the sex:
+
+```{r}
+brfss2013 %>% group_by(sex) %>% summarise(count=n())
+```
+
+This variable presents the outcomes 'Male' (201313 respondents) and 'Female' (290455 respondents), as well as NA values.
+
+Now, the variable 'checkups1'.
+
+```{r}
+brfss2013 %>% group_by(checkup1) %>% summarise(count=n())
+```
+
+We can see that 'checkups1' has 5 levels,from 'Within past year' since last checkup to 'Never doing any checkup. The level with most people is 'Within past year', and with less people is 'Never'. There are also NA values.
+
+As both variables has NA values, I'll create a new dataframe without them.
+
+```{r}
+checkups_sex <- brfss2013 %>% filter(!is.na(sex),!is.na(checkup1))
+```
+
+I want to analyse the length of time since last checkup with sex. To do this, I'll see proportion of males and females in each level of 'checkup1' to see how this proportion changes from the closest time since a checkup, to larger times until the 'Never' category. I'll store this proportions in a new 'prop_sexcheckup' object.
+
+```{r}
+prop_sexcheckup <- checkups_sex %>% group_by(checkup1) %>% summarise(Female=sum(sex=='Female')/n(),Male=sum(sex=='Male')/n())
+```
+
+Now, to view this new object.
+
+```{r}
+prop_sexcheckup
+```
+
+Seeing it, it's possible to see that as the time since last checkup increases, the proportion of females decreases, and the proportion of males increases. Taking from 0.617 in the 'Within past year' level to 0.484 in the 'Never' level for females, and from 0.383 to 0.516 for males.
+
+A good way of visualizing this data is through a segmented barplot. Creating one with ggplot2 is a little harder, and I had to search the internet on how to do this. I'll use the 'reshape2' package in order to convert my data from the 'wide' format to the 'long' format
+
+```{r}
+library(reshape2)
+```
+
+Now, transforming the data from 'wide' to 'long' with the function 'melt'
+
+```{r}
+new_prop_sexcheckup <- melt (prop_sexcheckup)
+```
+
+Now, it's possible to make the segmented barplot. I prefer that this graph be with inverted coordinates, and to do that I'll first invert the order of the checkup levels.
+
+```{r}
+new_prop_sexcheckup$checkup1 <- factor(new_prop_sexcheckup$checkup1, levels = c('Never','5 or more years ago', 'Within past 5 years','Within past 2 years', 'Within past year'))
+```
+
+Now creating the plot.
+
+```{r}
+ggplot(new_prop_sexcheckup, aes(checkup1, value, fill = variable)) + geom_bar(stat = "identity") + coord_flip() + labs(title = 'Length Of Time Since Last Routine Checkup among male and female respondents', y = 'Proportion', x = 'Time since last routine checkup ', fill = "Sex")
+```
+
+Again, it's possible to see that as the time since last checkup increases, the proportion of females decreases, and the proportion of males increases. Females have a smaller time since a last routine checkup, while males have a larger one. Female are the majority in 'Within past year' and 'Within past 2 years'. But in 'Within past 5 years' the proportion become very similar, and from there, males become the majority in '5 or more years ago' and in 'Never'. It appears to be a correlation between the variables.
+
+It's nice to see that the BRFSS data appers to corroborate a public health issue that is observed and documented: about how men aren't participating in the preventive care services. Primary and preventive care does not consist only in routine checkups, but it's part of it. 
+
+I can discuss a litle about the reasons of why this happens: maybe the social masculinity that men have to uphold, as they need to be 'strong', and figure of 'power', tends to create a distance between then and health services. Thus, they will only appear in specialized and emergency care. Also, some Brazilian studies show that primary care units can be a kinda of a 'uncomfortable' environment for some men, because they never were ambients projected for then, some even lacked of a male toilets. Future reading: http://www.tandfonline.com/doi/abs/10.1080/17437199.2013.840954 and http://www.scielo.br/scielo.php?script=sci_arttext&pid=S1413-81232011000700030
+
+
+
+
+**Research question 3:**
+
+To analyse if there are any correlation between income groups and sex and/or race I'll use use the following variables:
+
+income2: Income Level
+
+_race: Computed Race-Ethnicity Grouping
+
+sex: Respondents Sex
+
+I'll analyse each variable to see what is the information contained in each one. First, the 'income2':
+
+```{r}
+brfss2013 %>% group_by(income2) %>%   summarise(count = n())
+```
+
+The income level variable has 8 categories, each representing a level of income, and also with NA values. The level with most people is '$75,000 or more' and with less people is 'Less than $10,000'.
+
+Continuing, the '_race' variable:
+
+```{r}
+brfss2013 %>% group_by(X_race) %>%   summarise(count = n())
+```
+
+'_race' has 8 groups: 'White only, non-Hispanic', 'Black only, non-Hispanic', 'American Indian or Alaskan Native only, Non-Hispanic', 'Asian only, non-Hispanic', 'Native Hawaiian or other Pacific Islander only', 'Non-Hispanic', 'Other race only, non-Hispanic', 'Multiracial, non-Hispanic', and 'Hispanic'. There's also NA values. Whites are the category with most people and Native Hawaiian or other Pacific Islander with less.
+
+Now, the variable 'sex':
+
+```{r}
+brfss2013 %>% group_by(sex) %>% summarise(count=n())
+```
+
+This variable presents the outcomes 'Male' (201313 respondents) and 'Female' (290455 respondents), as well as NA values.
+
+All the variables has NA values, so, I'll create a new dataframe without them.
+
+```{r}
+sex_race_incomenona <- brfss2013 %>% filter(!is.na(income2), !is.na(sex), !is.na(X_race))
+
+```
+
+
+**Sex variable**
+
+First, I'll see the proportion of males and females in each income group,in order to see how sex is distributed in each income level. I'll create a dataframe named 'prop_sex_income' with these proportions.
+
+```{r}
+prop_sex_income <- sex_race_incomenona %>% group_by(income2) %>% summarise('Female' = sum(sex=='Female')/n(), 'Male'= sum(sex=='Male')/ n())
+```
+
+Seeing the new object.
+
+```{r}
+prop_sex_income
+```
+
+It's possible to see that females are the majority in every income level. However, as the levels increases, the proportion of females decreases, and the proportion of males increases, going from 0.324 to 0.487.
+
+I'll transform this data from 'wide' to 'long' in order to create a segmented barplot.
+
+```{r}
+new_prop_sex_income <- melt (prop_sex_income)
+```
+
+Now, creating the segmented barplot, putting linebreaks to make 'income2' legible.
+
+```{r}
+levels(new_prop_sex_income$income2) <- gsub(" ", "\n", levels(new_prop_sex_income$income2))
+
+ggplot(new_prop_sex_income, aes(income2, value, fill = variable)) + geom_bar(stat = "identity") + labs (title= 'Proportion of Males and Females in each income group', x= 'Income Level', y= 'Proportion', fill= 'Sex')
+```
+
+It's possible to see that the proportion of males increases as the income levels increases. The opposite is true to females: it decreases while the income levels increases. This shows a correlation between these variables: a positive one for the males proportion, and a negative one for females proportion.
+
+
+**Race variable**
+
+Now, Ill continue this analyses, using the same method as before but looking at the race variable.
+
+Creating the proportion of each racial group in each income level.
+```{r}
+prop_raceincome <- sex_race_incomenona %>% group_by(income2) %>% summarise('White only, non-Hispanic'= sum(X_race=='White only, non-Hispanic')/ n(), 'Black only, non-Hispanic'= sum(X_race=='Black only, non-Hispanic')/ n(), 'American Indian or Alaskan Native only, Non-Hispanic'= sum(X_race=='American Indian or Alaskan Native only, Non-Hispanic')/ n(), 'Asian only, non-Hispanic'= sum(X_race=='Asian only, non-Hispanic')/ n(), 'Asian only, non-Hispanic'= sum(X_race=='Asian only, non-Hispanic')/ n(), 'Native Hawaiian or other Pacific Islander only, Non-Hispanic'= sum(X_race=='Native Hawaiian or other Pacific Islander only, Non-Hispanic')/ n(), 'Other race only, non-Hispanic'= sum(X_race=='Other race only, non-Hispanic')/ n(), 'Multiracial, non-Hispanic'= sum(X_race=='Multiracial, non-Hispanic')/ n(), 'Other race only, non-Hispanic'= sum(X_race=='Other race only, non-Hispanic')/ n(), 'Hispanic'= sum(X_race=='Hispanic')/ n())
+```
+
+Seeing the new object.
+
+```{r}
+prop_raceincome
+```
+
+It's possible to see here that 'White only, non-Hispanic' proportion increases as the income levels increases but in the case of Blacks or Hispanics it decreases.
+
+Transforming the data from 'wide' to 'long'
+
+```{r}
+new_prop_raceincome <- melt (prop_raceincome)
+```
+
+Making a segmented barplot of the data, with linebreaks.
+
+```{r}
+levels(new_prop_raceincome$income2) <- gsub(" ", "\n", levels(new_prop_raceincome$income2))
+
+ggplot(new_prop_raceincome, aes(income2, value, fill = variable)) + geom_bar(stat = "identity") + labs(title= 'Proportion of each race group in each income group', y='Proportion', x= 'Income levels', fill='Race group') 
+```
+
+*Note: the x axis of this plot is pretty messy, I tried a lot of things to fix it, but I couldn't*
+
+With this graphic, it becomes clear that the proportion of white people increases, as the income levels increases. Analysing together with the 'prop_raceincome', it goes from '0.542' to '0.868' (!). It also become clear that proportion of blacks and hispanics decreases as the income level decreases. The other racial groups aren't very clear in the graphic, but seeing in 'prop_raceincome', they also decrease as the income levels increase, although not as much as for blacks and hispanics
+
+Seeing these two analyses (sex and race), it's possible to see the males and white people have bigger proportion in richer income levels. It appears to be a positive correlation between being male and being white with income levels: as the income levels increases, the proportion of these two groups increases as well.
+
+
+**Race & Sex variable**
+
+Now, I want to combine these two variables of sex and race. For now, we found that, in general, males and whites appears to become more prevalent as the income levels increases, but inside race groups, does the affirmation of increasing males proportion continues to be true?
+
+To analyse that, first I'll create a new variable named 'racegender', with every race group of 'X_race' divided in males and females.
+
+```{r}
+sex_race_incomenona <- sex_race_incomenona %>% mutate(racegender = ifelse(X_race=='White only, non-Hispanic' & sex=='Male', 'White Male', 
+ifelse(X_race=='White only, non-Hispanic'& sex=='Female', 'White Female', 
+ifelse(X_race=='Black only, non-Hispanic'& sex=='Male', 'Black Male', 
+ifelse(X_race=='Black only, non-Hispanic'& sex=='Female', 'Black Female', 
+ifelse(X_race=='American Indian or Alaskan Native only, Non-Hispanic'& sex=='Male', 'American Indian or Alaskan Native Male', 
+ifelse(X_race=='American Indian or Alaskan Native only, Non-Hispanic'& sex=='Female', 'American Indian or Alaskan Native Female', 
+ifelse(X_race=='Asian only, non-Hispanic'& sex=='Male', 'Asian Male', 
+ifelse(X_race=='Asian only, non-Hispanic'& sex=='Female', 'Asian Female', 
+ifelse(X_race=='Native Hawaiian or other Pacific Islander only, Non-Hispanic'& sex=='Male', 'Native Hawaiian or other Pacific Islander Male', 
+ifelse(X_race=='Native Hawaiian or other Pacific Islander only, Non-Hispanic'& sex=='Female', 'Native Hawaiian or other Pacific Islander Female', 
+ifelse(X_race=='Other race only, non-Hispanic'& sex=='Male', 'Other race Male', 
+ifelse(X_race=='Other race only, non-Hispanic'& sex=='Female', 'Other race Female', 
+ifelse(X_race=='Multiracial, non-Hispanic'& sex=='Male', 'Multiracial Male', 
+ifelse(X_race=='Multiracial, non-Hispanic'& sex=='Female', 'Multiracial female', 
+ifelse(X_race=='Hispanic'& sex=='Male', 'Hispanic Male', 
+ifelse(X_race=='Hispanic'& sex=='Female', 'Hispanic Female', 'NA'))))))) ))))))) )))
+```
+
+Now, I'll analyse the proportion of males and females inside the race groups in every income level. First, I'll start with black people.
+
+Creating a dataframe only with black males and females.
+
+```{r}
+black_sexincome <- sex_race_incomenona %>% filter(racegender %in% c('Black Female', 'Black Male')) %>% select(income2, racegender)
+```
+
+Creating a dataframe with the number of black males and females in each income level.
+
+```{r}
+new_black_sex_income <- black_sexincome %>% group_by(income2) %>% summarise('Black Female'= sum(racegender=='Black Female'), 'Black Male' = sum(racegender=='Black Male'))
+```
+
+Now, I'll add a variable of the Male/Female proportion to see how the proportion of black males/females behaves in each income level.  
+
+```{r}
+new_black_sex_income <- new_black_sex_income %>% mutate('Male/Female Proportion'= new_black_sex_income$`Black Male`/new_black_sex_income$`Black Female`)
+```
+
+Seeing the object with the new variable.
+
+```{r}
+new_black_sex_income
+```
+
+It's possible to see that the male/proportion increases as the income levels increases, going from 0.379 to 0.769.
+
+Doing a barplot to visually see this increase, and adding linebreaks.
+
+```{r}
+levels(new_black_sex_income$income2) <- gsub(" ", "\n", levels(new_black_sex_income$income2))
+
+ggplot(new_black_sex_income, aes(income2, new_black_sex_income$`Male/Female Proportion`)) + geom_bar(stat = "identity") + labs(title = 'Male/Female Proportion of Blacks in each income group', x= 'Income level', y= 'Male/Female Proportion')
+```
+
+With that, we can see that the same pattern of increased male proportion as income levels increase also happens inside black people. Females are still the marjority in all cases, but male/female proportion increases together with the income.  In lower incomes, from 'Less than $10,000' to 'Less than $25,000' the proportion are more than the double, or almost it. In the following levels, it's possible to see that proportion increases, but are still far from a proportion of 1.
+
+Now, doing the same thing I did for the black people group to white people.
+
+Creating a dataframe with only white people and income
+
+```{r}
+white_sexincome <- sex_race_incomenona %>% filter(racegender %in% c('White Female', 'White Male')) %>% select(income2,racegender)
+```
+
+Creating a dataframe with only white males and females in each income level
+
+```{r}
+new_whitesexincome <- white_sexincome %>% group_by(income2) %>% summarise('White Female' = sum(racegender=='White Female'), 'White Male' = sum(racegender=='White Male'))
+```
+
+Adding the male/female proportion variable.
+
+```{r}
+new_whitesexincome <- new_whitesexincome %>% mutate('Male/Female Proportion' = new_whitesexincome$`White Male`/new_whitesexincome$`White Female`)
+```
+
+Seeing the dataframe.
+
+```{r}
+new_whitesexincome
+```
+
+It's possible to see, again, that the male/female proportion increases as the income levels increases. Females, again, are still marjority of cases, but they have number too high on low income levels (almost the double in 'Less than $10,000'), and numbers that are similar to men's in the higher income levels. 
+
+Creating a graphic to show this data, with linebreaks.
+
+```{r}
+levels(new_whitesexincome$income2) <- gsub(" ", "\n", levels(new_whitesexincome$income2))
+
+
+ggplot(new_whitesexincome, aes(income2, new_whitesexincome$`Male/Female Proportion`)) + geom_bar(stat = "identity") + labs(title = 'Male/Female Proportion of Whites in each income level', x= 'Income level', y= 'Male/Female Proportion')
+```
+
+Among white people, the proportion between males and females are more equal than in the black people, for example. In the highest income, the male/female proportion is almost 1 (0.950), something more similar to the general population proportion of males/females.Still, females are almost the double than the number of males in the lowest income group, and slightly more than the double in the 'Less than $15,000'. 
+
+I'll do one last analyses with the group of hispanics, equal to the ones of Blacks and Whites.
+
+Creating a new dataframe with only hispanics and income.
+
+```{r}
+hispanic_sexincome <- sex_race_incomenona %>% filter(racegender %in% c('Hispanic Male', 'Hispanic Female')) %>% select(income2, racegender)
+```
+
+Creating a new dataframe with hispanics males and females in each income level.
+
+```{r}
+new_hispanicsexincome <- hispanic_sexincome %>% group_by(income2) %>% summarise('Hispanic Male' = sum(racegender=='Hispanic Male'), 'Hispanic Female' = sum(racegender == 'Hispanic Female'))
+```
+
+Adding male/female proportion
+
+```{r}
+new_hispanicsexincome <- new_hispanicsexincome %>% mutate('Male/Female Proportion' = new_hispanicsexincome$`Hispanic Male`/new_hispanicsexincome$`Hispanic Female`)
+```
+
+Seeing the object
+
+```{r}
+new_hispanicsexincome
+
+```
+
+Again, the male/proportion increases as the income levels increases.
+
+Creating a plot
+
+```{r}
+levels(new_hispanicsexincome$income2) <- gsub(" ", "\n", levels(new_hispanicsexincome$income2))
+
+ggplot(new_hispanicsexincome, aes(income2, new_hispanicsexincome$`Male/Female Proportion`)) + geom_bar(stat = "identity") + labs(title = 'Male/Female Proportion of Hispanics in each income Level', x= 'Income Level', y= 'Male/Female Proportion')
+```
+
+In the hispanics groups, however, it seems that the proportion are more equal than in the other groups, in the second level it already goes to 0,606. And the last ones are 0.911, 0.983 and 0.921, respectively. More closer than a proportion of 1:1 than every other group before.
+
+
+In conclusion, the survey that shows that white people are the majority in every income, it goes from '0.542' to '0.868'. It also become clear that proportion of blacks and hispanics (the other groups I focused here) decreases as the income level decreases. It appears to be a positive correlation between being white and income, and a negative in being black or hispanic and income. Discussing this data, it appears that White people are the vast marjority of richer people in the U.S, and answers of why this happens aren't simple or small, it comes from historical constructions, historical events, structural racism, and other factors.
+
+In addition, we also saw that females composes the majority of every income level. However, it appears that as income levels increase, the proportion of males increases as well, it appears to be a positive correlation between being a male and income level. This pattern repeats in every race group I've analyzed here(whites, blacks and hispanics). It reafirms the first correlation, but inside racial groups. 
+
+Another thing interesting that I've found is that, in every race group, women have bigger numbers in low income levels, with most of the times having more than the double number than males respondents. In general, however, as income levels increases, the male/female proportion start to increases, becoming more approximate to 1(that would mean equal numbers of man and women). It appears that females are more proeminent in lower income levels than males, with disproportionate higher number than males. 
+
+Discussing this, the reasons of why it would happens is another one with no simple or small answers, also with issues coming from historical construction, sexism, and other factors.
+
+The survey appers to be a powerful source of data regarding many aspects of many topics, and can provide insights to futher studies.
